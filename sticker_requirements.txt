@@ -1,0 +1,4 @@
+python-telegram-bot==21.9
+fal-client==0.5.9
+httpx==0.28.1
+python-dotenv==1.1.0
