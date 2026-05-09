@@ -1,0 +1,14 @@
+# railway.toml — Railway deployment configuration
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python main.py"
+restartPolicyType = "always"
+restartPolicyMaxRetries = 10
+
+# Health check (Railway will restart if unhealthy)
+healthcheckPath = "/"
+healthcheckTimeout = 30

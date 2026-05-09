@@ -1,0 +1,36 @@
+# ── Secrets ───────────────────────────────────
+.env
+*.key
+secrets/
+
+# ── Python ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ── Database (local dev only) ─────────────────
+data/*.db
+data/*.sqlite
+*.db
+*.sqlite3
+
+# ── Logs ──────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
