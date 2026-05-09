@@ -1,0 +1,13 @@
+# ── مطلوب ──
+BOT_TOKEN=توكن_البوت_من_BotFather
+FAL_KEY=مفتاح_fal.ai
+
+# ── اختياري ──
+BOT_USERNAME=اسم_البوت_بدون_@
+PACK_PRICE_STARS=75
+FREE_DAILY_LIMIT=2
+RATE_LIMIT_SECONDS=60
+ADMIN_IDS=رقم_ID_المشرف
+
+# ── Railway Volume (مهم لحفظ البيانات) ──
+DB_PATH=/data/sticker_bot.db
