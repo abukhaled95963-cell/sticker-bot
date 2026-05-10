@@ -12,6 +12,10 @@ from telegram.ext import (
     filters, ContextTypes
 )
 import httpx
+try:
+    import fal_client
+except ImportError:
+    fal_client = None
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
@@ -177,38 +181,60 @@ def set_rate(uid): _rate[uid] = time.time()
 #  FAL.AI — بدون fal-client (httpx مباشرة أكثر استقراراً)
 # ══════════════════════════════════════════════════════════
 async def upload_photo_to_fal(photo_bytes: bytes) -> str:
-    """يرفع الصورة لـ fal.ai storage ويعيد رابطاً عاماً"""
+    """
+    يرفع الصورة لـ fal.ai storage
+    يجرب 3 endpoints مختلفة مع تسجيل تفصيلي للأخطاء
+    """
+    headers_auth = {"Authorization": f"Key {FAL_KEY}"}
+
+    # ── المحاولة 1: storage.fal.ai/upload (multipart) ──
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
-                "https://rest.alpha.fal.ai/storage/upload/initiate",
-                headers={"Authorization": f"Key {FAL_KEY}"},
-                json={"content_type": "image/jpeg", "file_name": "photo.jpg"}
+                "https://storage.fal.ai/upload",
+                headers=headers_auth,
+                files={"file": ("photo.jpg", photo_bytes, "image/jpeg")}
             )
-            if r.status_code != 200:
-                log.error(f"fal initiate upload: {r.status_code} {r.text[:100]}")
-                return None
-            data      = r.json()
-            upload_url= data.get("upload_url")
-            file_url  = data.get("file_url")
-            if not upload_url:
-                log.error("fal: no upload_url in response")
-                return None
-            # رفع الملف الفعلي
-            ur = await client.put(
-                upload_url,
-                content=photo_bytes,
-                headers={"Content-Type": "image/jpeg"},
-                timeout=60
-            )
-            if ur.status_code in (200, 201, 204):
-                log.info(f"✅ Photo uploaded: {file_url}")
-                return file_url
-            log.error(f"fal put: {ur.status_code}")
-            return None
+            log.info(f"fal upload attempt1: status={r.status_code} body={r.text[:150]}")
+            if r.status_code == 200:
+                data = r.json()
+                url  = data.get("url") or data.get("file_url") or ""
+                if url:
+                    log.info(f"✅ Uploaded (attempt1): {url[:60]}")
+                    return url
     except Exception as e:
-        log.error(f"upload_photo_to_fal: {e}")
-        return None
+        log.warning(f"upload attempt1: {e}")
+
+    # ── المحاولة 2: storage.fal.ai/upload (raw bytes) ──
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(
+                "https://storage.fal.ai/upload",
+                headers={**headers_auth, "Content-Type": "image/jpeg"},
+                content=photo_bytes
+            )
+            log.info(f"fal upload attempt2: status={r.status_code} body={r.text[:150]}")
+            if r.status_code == 200:
+                data = r.json()
+                url  = data.get("url") or data.get("file_url") or ""
+                if url:
+                    log.info(f"✅ Uploaded (attempt2): {url[:60]}")
+                    return url
+    except Exception as e:
+        log.warning(f"upload attempt2: {e}")
+
+    # ── المحاولة 3: fal_client مكتبة ──
+    try:
+        import fal_client as _fal
+        import os as _os
+        _os.environ["FAL_KEY"] = FAL_KEY
+        url = await _fal.upload_async(photo_bytes, "image/jpeg", "photo.jpg")
+        log.info(f"✅ Uploaded (fal_client): {url[:60]}")
+        return url
+    except Exception as e:
+        log.error(f"upload attempt3 (fal_client): {e}")
+
+    raise RuntimeError("فشلت جميع محاولات رفع الصورة — تحقق من FAL_KEY")
 
 async def gen_sticker(image_url: str, style_prompt: str, expr: str) -> str:
     """يولّد ستيكر واحد عبر fal-ai/face-to-sticker"""
@@ -293,10 +319,21 @@ async def worker(bot):
                     "_انتظر 30-90 ثانية_ 🎨", parse_mode="Markdown")
 
                 # رفع الصورة
-                img_url = await upload_photo_to_fal(photo_bytes)
+                try:
+                    img_url = await upload_photo_to_fal(photo_bytes)
+                except Exception as ue:
+                    log.error(f"upload failed for uid={uid}: {ue}")
+                    await bot.send_message(chat_id,
+                        f"❌ خطأ في رفع الصورة:\n`{str(ue)[:100]}`\n\n"
+                        "تحقق من FAL_KEY في إعدادات Railway",
+                        parse_mode="Markdown")
+                    continue
                 if not img_url:
                     await bot.send_message(chat_id,
-                        "❌ فشل رفع الصورة\nتأكد أن الصورة واضحة وحاول مجدداً")
+                        "❌ فشل رفع الصورة للخادم\n"
+                        "السبب قد يكون:\n"
+                        "• مشكلة مؤقتة في الشبكة\n"
+                        "• حاول مجدداً بعد دقيقة 🔄")
                     continue
 
                 # توليد الستيكرات
