@@ -165,7 +165,7 @@ def get_stats():
 #  RATE LIMITER
 # ══════════════════════════════════════════════════════════
 _rate: dict = {}
-_busy: set  = set()
+_busy: set = set()
 
 def rate_left(uid) -> int:
     if uid in ADMIN_IDS: return 0
@@ -176,7 +176,7 @@ def set_rate(uid): _rate[uid] = time.time()
 # ══════════════════════════════════════════════════════════
 #  FAL.AI — بدون fal-client (httpx مباشرة أكثر استقراراً)
 # ══════════════════════════════════════════════════════════
-async def upload_photo_to_fal(photo_bytes: bytes) -> str | None:
+async def upload_photo_to_fal(photo_bytes: bytes) -> str:
     """يرفع الصورة لـ fal.ai storage ويعيد رابطاً عاماً"""
     try:
         async with httpx.AsyncClient(timeout=60) as client:
@@ -210,7 +210,7 @@ async def upload_photo_to_fal(photo_bytes: bytes) -> str | None:
         log.error(f"upload_photo_to_fal: {e}")
         return None
 
-async def gen_sticker(image_url: str, style_prompt: str, expr: str) -> str | None:
+async def gen_sticker(image_url: str, style_prompt: str, expr: str) -> str:
     """يولّد ستيكر واحد عبر fal-ai/face-to-sticker"""
     prompt = (
         f"{style_prompt}, {expr}, "
